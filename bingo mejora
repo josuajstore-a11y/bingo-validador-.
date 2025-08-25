@@ -1,0 +1,67 @@
+import streamlit as st
+import pandas as pd
+from openpyxl import load_workbook
+
+# Archivo Excel donde se guardan los datos
+EXCEL_FILE = "control_bingo_1000_cartas_validador.xlsx"
+
+# Cargar datos
+@st.cache_data
+def cargar_datos():
+    return pd.read_excel(EXCEL_FILE, sheet_name="Ventas")
+
+# Guardar cambios en el Excel
+def guardar_datos(df):
+    with pd.ExcelWriter(EXCEL_FILE, engine="openpyxl", mode="w") as writer:
+        df.to_excel(writer, sheet_name="Ventas", index=False)
+
+# ===================== INTERFAZ =====================
+
+st.set_page_config(page_title="🎲 Validador de Bingo", page_icon="🎟️", layout="centered")
+
+# Logo + Título
+st.title("🎲 Validador y Registro de Cartas de Bingo")
+st.markdown("Bienvenido al sistema oficial de control de cartas. Aquí puedes **validar** un código QR o **registrar la venta** de una nueva carta.")
+
+# Cargar base
+df = cargar_datos()
+
+# Tabs
+tab1, tab2 = st.tabs(["✅ Validar Carta", "🛒 Registrar Venta"])
+
+# ===================== VALIDAR CARTA =====================
+with tab1:
+    st.subheader("Validar código QR / ID de carta")
+    codigo = st.text_input("Ingrese el código QR / ID")
+
+    if st.button("Verificar", key="verificar"):
+        if codigo in df["ID"].values:
+            fila = df[df["ID"] == codigo].iloc[0]
+            if fila["Pagado"] == "SI":
+                st.success(f"✅ Carta válida y pagada.\n\n👤 Propietario: {fila['Jugador']}\n📧 Email: {fila['Email']}")
+            else:
+                st.warning("⚠️ La carta existe pero aún **NO está pagada**.")
+        else:
+            st.error("❌ Código inexistente en la base de datos.")
+
+# ===================== REGISTRAR VENTA =====================
+with tab2:
+    st.subheader("Registrar nueva venta")
+
+    with st.form("formulario_venta"):
+        id_carta = st.text_input("ID de la carta (ej: BINGO-CARTA-0001)")
+        nombre = st.text_input("Nombre del jugador")
+        email = st.text_input("Correo del jugador")
+        pagado = st.selectbox("¿Pagado?", ["NO", "SI"])
+
+        submitted = st.form_submit_button("💾 Guardar")
+
+        if submitted:
+            if id_carta in df["ID"].values:
+                # Actualizar datos de esa carta
+                df.loc[df["ID"] == id_carta, ["Jugador", "Email", "Pagado"]] = [nombre, email, pagado]
+                guardar_datos(df)
+                st.success(f"✅ Venta registrada para la carta {id_carta}.")
+            else:
+                st.error("❌ El ID no existe en la base de datos.")
+
